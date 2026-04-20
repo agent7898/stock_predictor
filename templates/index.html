@@ -3,222 +3,964 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Price Trend Predictor</title>
+    <title>StockSense | Time Series Prediction Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #0f0f13; color: #e0e0e8; margin: 0; padding: 0; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        h1 { text-align: center; color: #e0e0e8; }
-        .control-panel { background-color: #1a1a24; border: 1px solid #2a2a3a; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 20px; align-items: flex-end; justify-content: center; flex-wrap: wrap; }
-        .input-group { display: flex; flex-direction: column; gap: 6px; }
-        .input-group label { font-size: 12px; color: #888899; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-        .control-panel input, .control-panel select, .control-panel button { padding: 10px; background-color: #2a2a3a; color: #e0e0e8; border: 1px solid #4a9eff; border-radius: 4px; box-sizing: border-box; }
-        .control-panel button { background-color: #4a9eff; color: #fff; cursor: pointer; border: none; font-weight: bold; height: 39px; }
-        .control-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .loading { display: none; text-align: center; margin: 20px; font-weight: bold; color: #4aff9f; }
-        .error { display: none; background-color: #ff4a4a; color: white; padding: 10px; border-radius: 4px; text-align: center; margin-bottom: 20px; }
-        .chart-container { background-color: #1a1a24; border: 1px solid #2a2a3a; padding: 15px; border-radius: 8px; margin-bottom: 20px; height: 300px; position: relative; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; overflow: hidden; }
-        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #2a2a3a; }
-        th { background-color: #2a2a3a; }
-        .highlight { background-color: rgba(74, 255, 159, 0.2); }
+        :root {
+            --bg-base:        #080810;
+            --bg-surface:     #10101e;
+            --bg-elevated:    #181828;
+            --bg-hover:       #1e1e32;
+            --border:         #252538;
+            --border-accent:  #2e2e50;
+            --text-primary:   #e8e8f0;
+            --text-secondary: #9090b0;
+            --text-muted:     #505068;
+            --accent-blue:    #4f8ef7;
+            --accent-green:   #3ddc97;
+            --accent-red:     #f75f5f;
+            --accent-orange:  #f7a24f;
+            --accent-purple:  #a78bfa;
+            --accent-yellow:  #f7d94f;
+            --disclaimer-bg:  #1a1008;
+            --disclaimer-border: #f7a24f;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-size: 13px;
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-accent); }
+
+        /* HEADER AND BANNER */
+        .disclaimer-banner {
+            position: sticky;
+            top: 0;
+            background: var(--disclaimer-bg);
+            border-left: 3px solid var(--disclaimer-border);
+            padding: 10px 20px;
+            z-index: 1000;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        body.dismissed .disclaimer-banner { display: none; }
+        .disclaimer-icon { color: var(--accent-orange); font-size: 14px; }
+        .disclaimer-text { color: var(--text-secondary); font-size: 11.5px; flex-grow: 1; }
+        .disclaimer-close { color: var(--text-muted); cursor: pointer; font-size: 16px; margin-left: 10px; }
+
+        .app-header {
+            position: sticky;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            height: 56px;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-title-box { display: flex; align-items: baseline; gap: 10px; }
+        .header-title { color: var(--accent-blue); font-weight: 600; font-size: 16px; }
+        .header-subtitle { color: var(--text-muted); font-size: 11px; }
+        
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .clock { color: var(--text-secondary); font-size: 13px; }
+        .liver-pill {
+            background: var(--bg-elevated);
+            border-radius: 99px;
+            padding: 4px 10px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .live-dot { width: 6px; height: 6px; background: var(--accent-green); border-radius: 50%; }
+
+        /* GRID LAYOUT */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 220px 1fr 280px;
+            gap: 0;
+            height: calc(100vh - 56px); /* Modified by JS later */
+            overflow: hidden;
+        }
+        body:not(.dismissed) .main-layout { height: calc(100vh - 120px); }
+
+        .sidebar, .center-panel, .right-panel {
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .sidebar { border-right: 1px solid var(--border); }
+        .right-panel { border-left: 1px solid var(--border); }
+
+        /* LEFT SIDEBAR: WATCHLIST */
+        .section-label {
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .refresh-btn {
+            font-size: 10px; color: var(--accent-blue); cursor: pointer; border: none; background: none;outline:none;
+        }
+        .wl-card {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 10px; border-radius: 8px; margin-bottom: 4px;
+            background: var(--bg-elevated); border: 1px solid var(--border);
+            cursor: pointer; transition: background 0.15s, border-color 0.15s;
+        }
+        .wl-card:hover { background: var(--bg-hover); border-color: var(--border-accent); }
+        .wl-card.active { border-color: var(--accent-blue); }
+        
+        .wl-col { display: flex; flex-direction: column; }
+        .wl-ticker { font-weight: 600; font-size: 13px; color: var(--text-primary); }
+        .wl-name { font-size: 10px; color: var(--text-muted); }
+        .wl-price { font-size: 13px; font-weight: 500; color: var(--text-primary); text-align: right; }
+        .wl-pill { font-size: 10px; border-radius: 4px; padding: 1px 5px; margin-top:2px; text-align: right;}
+        
+        .wl-up { background: rgba(61,220,151,0.12); color: var(--accent-green); }
+        .wl-down { background: rgba(247,95,95,0.12); color: var(--accent-red); }
+        .wl-flat { background: rgba(144,144,176,0.12); color: var(--text-muted); }
+
+        .shimmer-card {
+            height: 45px; border-radius: 8px; margin-bottom: 4px;
+            background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-hover) 50%, var(--bg-elevated) 75%);
+            background-size: 400px 100%; animation: shimmer 1.4s infinite;
+        }
+        @keyframes shimmer { 0%{background-position:-200px 0} 100%{background-position:200px 0} }
+
+        /* CENTER PANEL */
+        .control-card {
+            background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px; margin-bottom: 16px;
+        }
+        .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        .control-field { display: flex; flex-direction: column; gap: 6px; }
+        .control-field.full { grid-column: span 2; }
+        
+        .control-label { font-size: 11px; color: var(--text-secondary); font-weight: 600; }
+        .control-input {
+            background: var(--bg-elevated); border: 1px solid var(--border);
+            border-radius: 8px; padding: 10px 14px; color: var(--text-primary);
+            font-size: 13px; outline: none; width: 100%;
+        }
+        .control-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(79,142,247,0.15); }
+        
+        .run-btn {
+            background: var(--accent-blue); color: white; font-weight: 600; font-size: 14px;
+            border-radius: 8px; padding: 12px; border: none; cursor: pointer; width: 100%;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .run-btn:hover { opacity: 0.88; }
+        .run-btn:active { transform: scale(0.98); }
+        .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Loading */
+        .loading-box {
+            background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 16px;
+        }
+        .spinner {
+            width: 36px; height: 36px; border: 3px solid var(--border);
+            border-top-color: var(--accent-blue); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 10px;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        .load-title { color: var(--text-primary); font-size: 15px; font-weight: 500; }
+        .load-sub { color: var(--text-muted); font-size: 12px; margin-bottom:15px; }
+        .step-list { text-align: left; max-width: 250px; margin: 0 auto; color: var(--text-secondary); font-size: 12px;}
+        .step-item { margin-bottom:4px; display: flex; align-items: center; gap:8px;}
+        .step-circle { color: var(--text-muted); }
+        .step-item.done .step-circle { color: var(--accent-green); }
+        .step-item.done { color: var(--text-primary); }
+
+        .error-banner {
+            background: rgba(247,95,95,0.1); border-left: 3px solid var(--accent-red);
+            padding: 12px; color: var(--accent-red); font-size: 12px; margin-bottom: 16px; border-radius:4px;
+        }
+
+        /* Results Area */
+        .summary-bar {
+            background: var(--bg-elevated); border-radius: 10px; padding: 14px 20px;
+            display: flex; justify-content: space-between; margin-bottom: 14px;
+        }
+        .sb-left { display: flex; flex-direction: column; }
+        .sb-tick { font-size: 20px; font-weight: 700; color: var(--text-primary); line-height:1; }
+        .sb-name { font-size: 12px; color: var(--text-muted); margin-top:4px;}
+        .sb-right { display: flex; gap: 20px; align-items: center;}
+        .sb-stat { display: flex; flex-direction: column; padding-left:20px; border-left: 1px solid var(--border); }
+        .sb-stat:first-child { border-left:none; padding-left:0; }
+        .sb-label { font-size: 10px; color: var(--text-muted); }
+        .sb-val { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+
+        .chart-card {
+            background: var(--bg-surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 16px; margin-bottom: 14px;
+        }
+        .cc-head { display: flex; justify-content: space-between; margin-bottom:10px; }
+        .cc-title { font-size: 14px; font-weight: 600; }
+        .cc-tag { font-size: 11px; background: var(--bg-elevated); padding: 2px 6px; border-radius:4px; color:var(--text-secondary); }
+        .chart-wrapper { position: relative; width: 100%; }
+
+        .forecast-table-wrap {
+            margin-top: 12px;
+            overflow-x: auto;
+        }
+        .forecast-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 920px;
+        }
+        .forecast-table th,
+        .forecast-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+            vertical-align: top;
+        }
+        .forecast-table th {
+            background: var(--bg-elevated);
+            color: var(--text-muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .forecast-model-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .forecast-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .forecast-delta {
+            font-size: 10px;
+            color: var(--text-muted);
+            line-height: 1.2;
+        }
+        .forecast-delta.up { color: var(--accent-green); }
+        .forecast-delta.down { color: var(--accent-red); }
+        .forecast-delta.flat { color: var(--text-secondary); }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { background: var(--bg-elevated); color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding:8px; text-align: left; }
+        td { padding: 10px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
+        tr:nth-child(even) { background: var(--bg-surface); }
+        tr:nth-child(odd) { background: var(--bg-elevated); }
+        
+        .badge { border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 600; }
+        .b-best { background: rgba(61,220,151,0.15); color: var(--accent-green); }
+        .b-weak { background: rgba(247,95,95,0.15); color: var(--accent-red); }
+        .b-mod { background: rgba(144,144,176,0.15); color: var(--text-secondary); }
+
+        /* Sentiment Panel */
+        .sent-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 14px; }
+        .sent-badge { border-radius: 10px; padding: 10px 24px; display: inline-block; margin: 12px auto; text-align: center; font-size: 22px; font-weight: 700; width:100%;}
+        .sent-sub { color: var(--text-secondary); font-size: 12px; text-align: center; font-style: italic; margin-bottom: 16px; }
+        .sent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;}
+        .sent-grid-box { background: var(--bg-elevated); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; }
+        .sg-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+        .sg-val { font-size: 16px; font-weight: 600; margin-top: 2px;}
+        .sg-sub { font-size: 9px; color: var(--text-muted); margin-top: 2px;}
+
+        /* RIGHT PANEL: HISTORY */
+        .hist-empty { text-align: center; color: var(--text-muted); margin-top: 40px; font-size:11px;}
+        .hc-card {
+            background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px;
+            padding: 12px; margin-bottom: 8px; cursor: pointer; transition: 0.15s; position: relative;
+        }
+        .hc-card:hover { border-color: var(--border-accent); background: var(--bg-hover); }
+        .hc-card .del-btn { position: absolute; top:5px; right:5px; display:none; color: var(--text-muted); cursor: pointer; font-size: 14px; padding:0 5px;}
+        .hc-card:hover .del-btn { display: block; }
+        .hc-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        
+        @media (max-width: 1199px) {
+            .main-layout { grid-template-columns: 200px 1fr; }
+            .right-panel { display: none; }
+        }
+        @media (max-width: 767px) {
+            .main-layout { display: flex; flex-direction: column; overflow-y: auto; }
+            .sidebar { border-right: none; border-bottom: 1px solid var(--border); height:auto; max-height:200px; }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Stock Price Trend Predictor</h1>
-        
-        <div class="control-panel">
-            <div class="input-group">
-                <label for="ticker">Stock Ticker</label>
-                <input type="text" id="ticker" value="AAPL" placeholder="e.g., AAPL">
+
+    <div class="disclaimer-banner" id="disclaimer">
+        <div class="disclaimer-icon">⚠</div>
+        <div class="disclaimer-text">
+            Disclaimer: This application is intended for educational and research purposes only. The predictions generated by this tool do not constitute financial advice, investment recommendations, or solicitation to buy or sell any securities. Past performance and predictive models are not reliable indicators of future results. Always consult a qualified financial advisor before making any investment decisions.
+        </div>
+        <div class="disclaimer-close" onclick="dismissDisclaimer()">×</div>
+    </div>
+
+    <header class="app-header">
+        <div class="header-title-box">
+            <div class="header-title">StockSense</div>
+            <div class="header-subtitle">Time Series Prediction Engine</div>
+        </div>
+        <div class="header-right">
+            <div class="clock" id="clock"></div>
+            <div class="liver-pill"><div class="live-dot"></div>Live Data</div>
+        </div>
+    </header>
+
+    <div class="main-layout">
+        <!-- LEFT: WATCHLIST -->
+        <aside class="sidebar">
+            <div class="section-label">
+                <span>WATCHLIST</span>
+                <button class="refresh-btn" onclick="loadWatchlist(true)">⟳ Refresh</button>
             </div>
-            
-            <div class="input-group">
-                <label for="period">Historical Data</label>
-                <select id="period">
-                    <option value="1y">1 Year</option>
-                    <option value="2y" selected>2 Years</option>
-                    <option value="3y">3 Years</option>
-                    <option value="5y">5 Years</option>
-                </select>
+            <div id="wl_container"></div>
+            <div id="wl_error" style="display:none;" class="hist-empty">Could not load watchlist. Markets may be closed.</div>
+            <div id="wl_update" style="font-size:10px; color:var(--text-muted); text-align:center; margin-top:10px;"></div>
+        </aside>
+
+        <!-- CENTER: PREDICTIONS -->
+        <main class="center-panel" id="center_panel">
+            <div class="control-card">
+                <div class="control-grid">
+                    <div class="control-field full">
+                        <label class="control-label">Stock Ticker</label>
+                        <input type="text" id="ticker" class="control-input" value="AAPL" placeholder="e.g. AAPL, TSLA, MSFT" oninput="this.value = this.value.toUpperCase()">
+                    </div>
+                    <div class="control-field">
+                        <label class="control-label">Data Period</label>
+                        <select id="period" class="control-input">
+                            <option value="1y">1 Year</option>
+                            <option value="2y" selected>2 Years</option>
+                            <option value="3y">3 Years</option>
+                            <option value="5y">5 Years</option>
+                        </select>
+                    </div>
+                    <div class="control-field">
+                        <label class="control-label" id="fh_label">Forecast Horizon 30d</label>
+                        <input type="range" id="forecast_days" min="7" max="90" step="1" value="30" style="width:100%; accent-color: var(--accent-blue);" oninput="document.getElementById('fh_label').innerText = 'Forecast Horizon ' + this.value + 'd'">
+                        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted)">
+                            <span>7 days</span><span>90 days</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="run_btn" class="run-btn" onclick="runPrediction()">Run Prediction</button>
             </div>
-            
-            <div class="input-group">
-                <label for="forecast_days">Forecast Limit (Days)</label>
-                <input type="number" id="forecast_days" value="30" min="1" max="90">
+
+            <div id="error_banner" class="error-banner" style="display: none;"></div>
+
+            <div id="loading_state" class="loading-box" style="display: none;">
+                <div class="spinner"></div>
+                <div class="load-title">Training Models</div>
+                <div class="load-sub">This may take 60–120 seconds. Please wait.</div>
+                <div class="step-list" id="step_list">
+                    <div class="step-item"><span class="step-circle">○</span> Fetching data from Yahoo Finance</div>
+                    <div class="step-item"><span class="step-circle">○</span> Training Linear Regression model</div>
+                    <div class="step-item"><span class="step-circle">○</span> Running ARIMA grid search</div>
+                    <div class="step-item"><span class="step-circle">○</span> Training LSTM neural network</div>
+                </div>
             </div>
-            
-            <button id="run_btn">Run Prediction</button>
-        </div>
-        
-        <div id="loading" class="loading">Training models... this may take 60–120 seconds</div>
-        <div id="error" class="error"></div>
-        
-        <div class="chart-container" id="history_chart_container">
-            <canvas id="history_chart"></canvas>
-        </div>
-        
-        <div class="chart-container" id="comparison_chart_container" style="display: none;">
-            <canvas id="comparison_chart"></canvas>
-        </div>
-        
-        <div class="chart-container" id="forecast_chart_container" style="display: none;">
-            <canvas id="forecast_chart"></canvas>
-        </div>
-        
-        <table id="metrics_table" style="display: none;">
-            <thead>
-                <tr>
-                    <th>Model</th>
-                    <th>MAE</th>
-                    <th>RMSE</th>
-                    <th>R²</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+
+            <!-- RESULTS -->
+            <div id="results_area" style="display: none;">
+                <!-- D1 -->
+                <div class="summary-bar">
+                    <div class="sb-left">
+                        <div class="sb-tick" id="res_ticker">AAPL</div>
+                        <div class="sb-name" id="res_name">Apple</div>
+                    </div>
+                    <div class="sb-right">
+                        <div class="sb-stat"><span class="sb-label">Current Price</span><span class="sb-val" id="res_price">$0.00</span></div>
+                        <div class="sb-stat"><span class="sb-label">Period</span><span class="sb-val" id="res_period">2y</span></div>
+                        <div class="sb-stat"><span class="sb-label">Data Points</span><span class="sb-val" id="res_pts">0</span></div>
+                        <div class="sb-stat"><span class="sb-label">Forecast</span><span class="sb-val" id="res_fd">30 days</span></div>
+                    </div>
+                </div>
+
+                <!-- D2 -->
+                <div class="chart-card">
+                    <div class="cc-head"><span class="cc-title">Price History</span><span class="cc-tag" id="tag_d2">2Y</span></div>
+                    <div class="chart-wrapper" style="height:220px;"><canvas id="c_hist"></canvas></div>
+                </div>
+
+                <!-- D3 -->
+                <div class="chart-card">
+                    <div class="cc-head"><span class="cc-title">Model vs Actual (Test Set)</span></div>
+                    <div class="chart-wrapper" style="height:260px;"><canvas id="c_comp"></canvas></div>
+                </div>
+
+                <!-- D4 -->
+                <div class="chart-card">
+                    <div class="cc-head"><span class="cc-title">Price Forecast — Next Data</span></div>
+                    <div class="chart-wrapper" style="height:260px;"><canvas id="c_fore"></canvas></div>
+                    <div class="forecast-table-wrap">
+                        <table class="forecast-table" id="forecast_table">
+                            <thead>
+                                <tr>
+                                    <th>Day</th>
+                                    <th>Linear Regression</th>
+                                    <th>ARIMA</th>
+                                    <th>LSTM</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forecast_table_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- D5 -->
+                <div class="chart-card" style="padding:0; overflow:hidden;">
+                    <table>
+                        <thead><tr><th>Model</th><th>MAE</th><th>RMSE</th><th>R²</th><th>Verdict</th></tr></thead>
+                        <tbody id="metrics_tbody"></tbody>
+                    </table>
+                </div>
+
+                <!-- SENTIMENT -->
+                <div id="sent_skeleton" class="sent-card" style="display:none; text-align:center;">
+                    <div class="spinner" style="width:20px;height:20px;"></div>
+                    <div style="color:var(--text-muted);font-size:11px;">Computing Sentiment Analysis...</div>
+                </div>
+
+                <div id="sent_area" class="sent-card" style="display:none;">
+                    <div class="cc-head"><span class="cc-title">Market Sentiment</span><span class="cc-tag" id="sent_tkr"></span></div>
+                    <div id="sent_badge" class="sent-badge">Neutral</div>
+                    <div id="sent_sub" class="sent-sub">Generating...</div>
+                    <div class="sent-grid">
+                        <div class="sent-grid-box"><span class="sg-lbl">RSI (14D)</span><span class="sg-val" id="sv_rsi"></span><span class="sg-sub">Overbought > 70 | Oversold < 30</span></div>
+                        <div class="sent-grid-box"><span class="sg-lbl">Momentum (10D)</span><span class="sg-val" id="sv_mom"></span><span class="sg-sub">Short-term trend</span></div>
+                        <div class="sent-grid-box"><span class="sg-lbl">SMA Signal</span><span class="sg-val" id="sv_sma"></span><span class="sg-sub">20D vs 50D</span></div>
+                        <div class="sent-grid-box"><span class="sg-lbl">Volatility</span><span class="sg-val" id="sv_vol"></span><span class="sg-sub" id="sv_volL">Level</span></div>
+                        <div class="sent-grid-box"><span class="sg-lbl">52W High</span><span class="sg-val" id="sv_52w"></span><span class="sg-sub">% from high</span></div>
+                        <div class="sent-grid-box"><span class="sg-lbl">Score</span><span class="sg-val" id="sv_sco"></span><span class="sg-sub">Net Tech Score</span></div>
+                    </div>
+                    <div style="font-size:10px; color:var(--text-muted); font-style:italic; text-align:center;">Sentiment is computed from technical indicators only. It does not reflect news, earnings, or macroeconomic factors.</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT: HISTORY -->
+        <aside class="right-panel">
+            <div class="section-label">
+                <span>HISTORY</span>
+                <span class="refresh-btn" style="color:var(--accent-red);" onclick="clearHistory()">Clear All</span>
+            </div>
+            <div id="hist_container"></div>
+        </aside>
     </div>
 
     <script>
-        const runBtn = document.getElementById('run_btn');
-        const loading = document.getElementById('loading');
-        const errorMsg = document.getElementById('error');
-        
-        let historyChart, comparisonChart, forecastChart;
+        // ── STATE ──────────────────────────────────
+        let currentResult = null;
+        let currentSentiment = null;
+        let chartInstances = {};
+        let animInt = null;
 
-        function renderCharts(data) {
-            // Unhide containers
-            document.getElementById('comparison_chart_container').style.display = 'block';
-            document.getElementById('forecast_chart_container').style.display = 'block';
-            document.getElementById('metrics_table').style.display = 'table';
-            
-            // Destroy existing charts
-            if (historyChart) historyChart.destroy();
-            if (comparisonChart) comparisonChart.destroy();
-            if (forecastChart) forecastChart.destroy();
-            
-            // 1. History Chart (Mountain/Line)
-            const ctxHistory = document.getElementById('history_chart').getContext('2d');
-            historyChart = new Chart(ctxHistory, {
-                type: 'line',
-                data: {
-                    labels: data.dates,
-                    datasets: [{
-                        label: `${data.ticker} Historical Close Price`,
-                        data: data.prices,
-                        borderColor: '#888899',
-                        backgroundColor: 'rgba(136, 136, 153, 0.2)',
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        fill: true
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+        const COMPANY_NAMES = {
+            "AAPL":"Apple", "MSFT":"Microsoft", "GOOGL":"Alphabet", "AMZN":"Amazon",
+            "TSLA":"Tesla", "NVDA":"NVIDIA", "META":"Meta", "NFLX":"Netflix",
+            "AMD":"AMD", "RELIANCE.NS":"Reliance Ind.", "TCS.NS":"TCS", "INFY.NS":"Infosys"
+        };
 
-            // 2. Comparison Chart
-            const lengths = [
-                data.linear_regression.test_actual.length,
-                data.arima.test_actual.length,
-                data.lstm.test_actual.length
-            ];
-            const maxLen = Math.max(...lengths);
+        // ── INIT ───────────────────────────────────
+        window.onload = () => {
+            renderHistory();
+            startClock();
+            loadWatchlist();
+            setInterval(loadWatchlist, 60000);
             
-            // Pad arrays with nulls so shorter predictions map to the correct end dates
-            const padArray = (arr, length) => Array(length - arr.length).fill(null).concat(arr);
-            
-            const lrPred = padArray(data.linear_regression.test_predicted, maxLen);
-            const arimaPred = padArray(data.arima.test_predicted, maxLen);
-            const lstmPred = padArray(data.lstm.test_predicted, maxLen);
-            
-            const actualPrices = data.prices.slice(-maxLen);
-            const comparisonLabels = data.dates.slice(-maxLen);
-            
-            const ctxComp = document.getElementById('comparison_chart').getContext('2d');
-            comparisonChart = new Chart(ctxComp, {
-                type: 'line',
-                data: {
-                    labels: comparisonLabels,
-                    datasets: [
-                        { label: 'Actual Price', data: actualPrices, borderColor: '#e0e0e8', borderWidth: 2, pointRadius: 0, fill: false },
-                        { label: 'LR Pred', data: lrPred, borderColor: '#4a9eff', pointRadius: 0, fill: false },
-                        { label: 'ARIMA Pred', data: arimaPred, borderColor: '#ff9f4a', pointRadius: 0, fill: false },
-                        { label: 'LSTM Pred', data: lstmPred, borderColor: '#4aff9f', pointRadius: 0, fill: false }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+            // Check dismissed state
+            if(sessionStorage.getItem('disclaimerDismissed') === 'true'){
+                document.body.classList.add('dismissed');
+            }
+        };
 
-            // 3. Forecast Chart
-            const ctxForecast = document.getElementById('forecast_chart').getContext('2d');
-            forecastChart = new Chart(ctxForecast, {
-                type: 'line',
-                data: {
-                    labels: data.forecast_dates,
-                    datasets: [
-                        { label: 'LR Forecast', data: data.linear_regression.forecast, borderColor: '#4a9eff', borderDash: [5, 5], pointRadius: 0, fill: false },
-                        { label: 'ARIMA Forecast', data: data.arima.forecast, borderColor: '#ff9f4a', borderDash: [5, 5], pointRadius: 0, fill: false },
-                        { label: 'LSTM Forecast', data: data.lstm.forecast, borderColor: '#4aff9f', borderDash: [5, 5], pointRadius: 0, fill: false }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+        function dismissDisclaimer() {
+            document.body.classList.add('dismissed');
+            sessionStorage.setItem('disclaimerDismissed', 'true');
+        }
 
-            // Populate table
-            const tbody = document.querySelector('#metrics_table tbody');
-            tbody.innerHTML = '';
-            
-            const metrics = [
-                { name: 'Linear Regression', mae: data.linear_regression.mae, rmse: data.linear_regression.rmse, r2: data.linear_regression.r2.toFixed(4) },
-                { name: 'ARIMA', mae: data.arima.mae, rmse: data.arima.rmse, r2: '—' },
-                { name: 'LSTM', mae: data.lstm.mae, rmse: data.lstm.rmse, r2: '—' }
-            ];
-            
-            let minRmse = Math.min(...metrics.map(m => m.rmse));
-            
-            metrics.forEach(m => {
-                const tr = document.createElement('tr');
-                if (m.rmse === minRmse) tr.className = 'highlight';
-                tr.innerHTML = `<td>${m.name}</td><td>${m.mae.toFixed(4)}</td><td>${m.rmse.toFixed(4)}</td><td>${m.r2}</td>`;
-                tbody.appendChild(tr);
+        // ── CLOCK ──────────────────────────────────
+        function startClock() {
+            setInterval(() => {
+                const now = new Date();
+                const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+                const mos = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                document.getElementById('clock').innerText = `${days[now.getDay()]}, ${now.getDate()} ${mos[now.getMonth()]} ${now.getFullYear()}  ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+            }, 1000);
+        }
+
+        // ── WATCHLIST ──────────────────────────────
+        async function loadWatchlist(force=false) {
+            const wc = document.getElementById('wl_container');
+            if(wc.innerHTML==='') {
+                wc.innerHTML = '';
+                for(let i=0; i<12; i++) wc.innerHTML += '<div class="shimmer-card"></div>';
+            }
+            try {
+                const res = await fetch('/api/watchlist');
+                const data = await res.json();
+                if(data.stocks) renderWatchlist(data.stocks);
+                else document.getElementById('wl_error').style.display = 'block';
+            } catch(e) {
+                document.getElementById('wl_error').style.display = 'block';
+                wc.innerHTML = '';
+            }
+            const d = new Date();
+            document.getElementById('wl_update').innerText = `Updated ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+
+        function renderWatchlist(stocks) {
+            const wc = document.getElementById('wl_container');
+            wc.innerHTML = '';
+            document.getElementById('wl_error').style.display = 'none';
+            const curTkr = document.getElementById('ticker').value.toUpperCase();
+
+            stocks.forEach(s => {
+                const cname = COMPANY_NAMES[s.ticker] || s.ticker;
+                const active = s.ticker === curTkr ? 'active' : '';
+                const clazz = s.direction==='up' ? 'wl-up' : (s.direction==='down' ? 'wl-down' : 'wl-flat');
+                const p = formatPrice(s.ticker, s.price);
+                const sign = s.change > 0 ? '+' : '';
+                
+                wc.innerHTML += `
+                    <div class="wl-card ${active}" onclick="selectStock('${s.ticker}')">
+                        <div class="wl-col">
+                            <span class="wl-ticker">${s.ticker}</span>
+                            <span class="wl-name">${cname}</span>
+                        </div>
+                        <div class="wl-col">
+                            <span class="wl-price">${p}</span>
+                            <span class="wl-pill ${clazz}">${sign}${s.change.toFixed(2)} (${sign}${s.change_pct.toFixed(2)}%)</span>
+                        </div>
+                    </div>`;
             });
         }
 
-        runBtn.addEventListener('click', async () => {
+        function selectStock(ticker) {
+            document.getElementById('ticker').value = ticker;
+            document.querySelectorAll('.wl-card').forEach(c => c.classList.remove('active'));
+            const c = Array.from(document.querySelectorAll('.wl-ticker')).find(x => x.innerText === ticker);
+            if(c) c.parentElement.parentElement.classList.add('active');
+        }
+
+        // ── PREDICTION ─────────────────────────────
+        async function runPrediction() {
             const ticker = document.getElementById('ticker').value;
             const period = document.getElementById('period').value;
-            const forecastDays = document.getElementById('forecast_days').value;
-            
-            if (!ticker) return;
+            const fd = document.getElementById('forecast_days').value;
+            if(!ticker) return;
 
-            loading.style.display = 'block';
-            errorMsg.style.display = 'none';
-            runBtn.disabled = true;
+            document.getElementById('error_banner').style.display = 'none';
+            document.getElementById('results_area').style.display = 'none';
+            document.getElementById('run_btn').disabled = true;
+            document.getElementById('loading_state').style.display = 'block';
+
+            // Reset steps
+            const items = document.querySelectorAll('.step-item');
+            items.forEach(i => { i.classList.remove('done'); i.querySelector('.step-circle').innerText='○'; });
+            let st = 0; clearInterval(animInt);
+            animInt = setInterval(() => {
+                if(st < items.length) {
+                    items[st].classList.add('done');
+                    items[st].querySelector('.step-circle').innerText='✓';
+                    st++;
+                }
+            }, 3000);
 
             try {
                 const res = await fetch('/api/predict', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ticker: ticker, period: period, forecast_days: parseInt(forecastDays) })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ticker, period, forecast_days: parseInt(fd) })
                 });
-                
                 const data = await res.json();
                 
-                if (data.error) {
-                    throw new Error(data.error);
+                clearInterval(animInt);
+                items.forEach(i => { i.classList.add('done'); i.querySelector('.step-circle').innerText='✓'; });
+                
+                if(data.error) throw new Error(data.error);
+
+                currentResult = data;
+                currentSentiment = null;
+                document.getElementById('loading_state').style.display = 'none';
+                document.getElementById('results_area').style.display = 'block';
+                document.getElementById('run_btn').disabled = false;
+                
+                renderResults(data);
+
+                // Fetch Sentiment
+                document.getElementById('sent_area').style.display = 'none';
+                document.getElementById('sent_skeleton').style.display = 'block';
+                
+                const sentRes = await fetch('/api/sentiment/' + ticker);
+                const sentData = await sentRes.json();
+                
+                document.getElementById('sent_skeleton').style.display = 'none';
+                if(!sentData.error) {
+                    currentSentiment = sentData;
+                    renderSentiment(sentData);
+                    saveToHistory();
                 }
                 
-                renderCharts(data);
-                
-            } catch (err) {
-                errorMsg.textContent = "Error: " + err.message;
-                errorMsg.style.display = 'block';
-            } finally {
-                loading.style.display = 'none';
-                runBtn.disabled = false;
+            } catch(e) {
+                clearInterval(animInt);
+                document.getElementById('loading_state').style.display = 'none';
+                document.getElementById('run_btn').disabled = false;
+                const eb = document.getElementById('error_banner');
+                eb.innerText = "⚠ Error: " + e.message;
+                eb.style.display = 'block';
             }
-        });
+        }
+
+        // ── RENDERING ──────────────────────────────
+        function buildGradient(ctx, color) {
+            const grad = ctx.createLinearGradient(0, 0, 0, 220);
+            grad.addColorStop(0, color.replace(')', ', 0.25)').replace('rgb', 'rgba'));
+            grad.addColorStop(1, color.replace(')', ', 0)').replace('rgb', 'rgba'));
+            return grad;
+        }
+
+        function renderChart(id, config) {
+            if(chartInstances[id]) chartInstances[id].destroy();
+            const ctx = document.getElementById(id).getContext('2d');
+            chartInstances[id] = new Chart(ctx, config);
+            return chartInstances[id];
+        }
+
+        function renderResults(data) {
+            // D1 Summary
+            document.getElementById('res_ticker').innerText = data.ticker;
+            document.getElementById('res_name').innerText = COMPANY_NAMES[data.ticker] || data.ticker;
+            document.getElementById('res_price').innerText = formatPrice(data.ticker, data.prices[data.prices.length-1]);
+            document.getElementById('res_period').innerText = document.getElementById('period').value.toUpperCase();
+            document.getElementById('res_pts').innerText = data.prices.length;
+            document.getElementById('res_fd').innerText = document.getElementById('forecast_days').value + ' days';
+            document.getElementById('tag_d2').innerText = document.getElementById('period').value.toUpperCase();
+
+            // Extract colors
+            const cstyle = getComputedStyle(document.body);
+            const cLR = cstyle.getPropertyValue('--accent-purple').trim();
+            const cAR = cstyle.getPropertyValue('--accent-orange').trim();
+            const cLS = cstyle.getPropertyValue('--accent-blue').trim();
+            const cAc = cstyle.getPropertyValue('--text-secondary').trim();
+            
+            if (!data.linear_regression || !data.arima || !data.lstm) {
+                const eb = document.getElementById('error_banner');
+                eb.innerText = "⚠ Error: Incomplete response from server. Please try again.";
+                eb.style.display = 'block';
+                return;
+            }
+
+            // D2 Hist
+            const ctxHist = document.getElementById('c_hist').getContext('2d');
+            renderChart('c_hist', {
+                type: 'line',
+                data: {
+                    labels: data.dates,
+                    datasets: [{
+                        label: 'Price',
+                        data: data.prices,
+                        borderColor: cLS, borderWidth: 2, pointRadius: 0,
+                        fill: true, backgroundColor: buildGradient(ctxHist, cLS)
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 3 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                        y: { position: 'right', grid: { color: 'rgba(255,255,255,0.04)' } }
+                    }
+                }
+            });
+
+            // D3 Comp
+            const labelsComp = data.test_dates || [];
+            const actY = data.linear_regression.test_actual || [];
+            
+            renderChart('c_comp', {
+                type: 'line',
+                data: {
+                    labels: labelsComp,
+                    datasets: [
+                        { label: 'Actual', data: actY, borderColor: '#ffffff', borderWidth:1.5, pointRadius:0, tension:0.3 },
+                        { label: 'Linear Regression', data: data.linear_regression.test_predicted, borderColor: cLR, borderWidth:2, pointRadius:0, tension:0.3 },
+                        { label: 'ARIMA', data: data.arima.test_predicted, borderColor: cAR, borderWidth:2, pointRadius:0, tension:0.3 },
+                        { label: 'LSTM', data: data.lstm.test_predicted, borderColor: cLS, borderWidth:2, pointRadius:0, tension:0.3 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: { x:{ticks:{maxTicksLimit:5}}, y:{position:'right'} }
+                }
+            });
+
+            // D4 Fore
+            const cDays = 30;
+            const rPx = data.prices.slice(-cDays).concat(Array(data.forecast_dates.length).fill(null));
+            const lastPx = data.prices[data.prices.length - 1];
+            const padFore = (arr) => Array(cDays - 1).fill(null).concat([lastPx, ...arr]);
+            
+            renderChart('c_fore', {
+                type: 'line',
+                data: {
+                    labels: data.dates.slice(-cDays).concat(data.forecast_dates),
+                    datasets: [
+                        { label: 'Past 30D', data: rPx, borderColor: cAc, borderWidth:2, pointRadius:0, borderDash:[] },
+                        { label: 'Linear Regression', data: padFore(data.linear_regression.forecast), borderColor: cLR, borderWidth:2, pointRadius:0, borderDash:[6,3] },
+                        { label: 'ARIMA', data: padFore(data.arima.forecast), borderColor: cAR, borderWidth:2, pointRadius:0, borderDash:[6,3] },
+                        { label: 'LSTM', data: padFore(data.lstm.forecast), borderColor: cLS, borderWidth:2, pointRadius:0, borderDash:[6,3] }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x:{ticks:{maxTicksLimit:5}}, y:{position:'right'} }
+                }
+            });
+
+            // Forecast table: first 7 days with day-over-day change shown below each value.
+            const forecastBody = document.getElementById('forecast_table_body');
+            forecastBody.innerHTML = '';
+            const forecastDaysToShow = Math.min(7, data.forecast_dates.length, data.linear_regression.forecast.length, data.arima.forecast.length, data.lstm.forecast.length);
+            const modelRows = [
+                { id: 'lr', name: 'Linear Regression', values: data.linear_regression.forecast, color: cLR },
+                { id: 'ar', name: 'ARIMA', values: data.arima.forecast, color: cAR },
+                { id: 'ls', name: 'LSTM', values: data.lstm.forecast, color: cLS }
+            ];
+
+            for (let i = 0; i < forecastDaysToShow; i++) {
+                const dayLabel = data.forecast_dates[i] || `Day ${i + 1}`;
+                const cells = modelRows.map(model => {
+                    const current = parseFloat(model.values[i]);
+                    const previous = i === 0 ? parseFloat(data.prices[data.prices.length - 1]) : parseFloat(model.values[i - 1]);
+                    const delta = current - previous;
+                    const deltaPct = previous !== 0 ? (delta / previous) * 100 : 0;
+                    const deltaClass = delta > 0 ? 'up' : (delta < 0 ? 'down' : 'flat');
+                    const deltaSign = delta > 0 ? '+' : '';
+                    return `
+                        <td>
+                            <div class="forecast-model-cell" style="border-left: 3px solid ${model.color}; padding-left: 8px;">
+                                <div class="forecast-value">${formatPrice(data.ticker, current)}</div>
+                                <div class="forecast-delta ${deltaClass}">${deltaSign}${formatPrice(data.ticker, Math.abs(delta)).replace(/^[$₹]/, '')} (${deltaSign}${deltaPct.toFixed(2)}%) vs prev day</div>
+                            </div>
+                        </td>`;
+                }).join('');
+
+                forecastBody.innerHTML += `
+                    <tr>
+                        <td>
+                            <div style="font-weight:600;color:var(--text-primary)">${dayLabel}</div>
+                            <div style="font-size:10px;color:var(--text-muted)">Next ${i + 1} day</div>
+                        </td>
+                        ${cells}
+                    </tr>`;
+            }
+
+            // D5 Metrics
+            const tb = document.getElementById('metrics_tbody');
+            tb.innerHTML = '';
+            
+            const models = [
+                { id: 'LR', name: 'Linear Regression', m: data.linear_regression, c: cLR },
+                { id: 'AR', name: 'ARIMA', m: data.arima, c: cAR },
+                { id: 'LS', name: 'LSTM', m: data.lstm, c: cLS }
+            ];
+            
+            let minRmse = Math.min(...models.map(x=>x.m.rmse));
+            let maxRmse = Math.max(...models.map(x=>x.m.rmse));
+
+            models.forEach(mod => {
+                let badge = `<span class="badge b-mod">Moderate</span>`;
+                if (mod.m.rmse === minRmse) badge = `<span class="badge b-best">Best</span>`;
+                else if (mod.m.rmse === maxRmse) badge = `<span class="badge b-weak">Weakest</span>`;
+                
+                const r2flag = mod.id === 'LR' ? mod.m.r2.toFixed(4) : '—';
+                
+                tb.innerHTML += `<tr>
+                    <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${mod.c};margin-right:6px"></span>${mod.name}</td>
+                    <td>${mod.m.mae.toFixed(4)}</td>
+                    <td>${mod.m.rmse.toFixed(4)}</td>
+                    <td>${r2flag}</td>
+                    <td>${badge}</td>
+                </tr>`;
+            });
+        }
+
+        function renderSentiment(data) {
+            document.getElementById('sent_area').style.display = 'block';
+            document.getElementById('sent_tkr').innerText = data.ticker;
+            
+            const bgClass = getSentimentColorInfo(data.sentiment);
+            const bdg = document.getElementById('sent_badge');
+            bdg.innerText = data.sentiment;
+            bdg.style.color = bgClass.c;
+            bdg.style.background = bgClass.bg;
+            document.getElementById('sent_sub').innerText = data.summary;
+
+            const getCol = (cond, tg, tr, norm='var(--text-secondary)') => cond ? tg : (tr?tr:norm);
+            
+            // RSI
+            document.getElementById('sv_rsi').innerText = data.rsi.toFixed(2);
+            document.getElementById('sv_rsi').style.color = getCol(data.rsi<30, 'var(--accent-green)', getCol(data.rsi>70, 'var(--accent-red)'));
+            
+            // Mom
+            document.getElementById('sv_mom').innerText = formatPct(data.momentum_pct);
+            document.getElementById('sv_mom').style.color = getCol(data.momentum_pct>0, 'var(--accent-green)', getCol(data.momentum_pct<0, 'var(--accent-red)'));
+
+            // SMA
+            document.getElementById('sv_sma').innerText = data.sma_signal.charAt(0).toUpperCase() + data.sma_signal.slice(1);
+            document.getElementById('sv_sma').style.color = getCol(data.sma_signal==='bullish', 'var(--accent-green)', 'var(--accent-red)');
+
+            // Vol
+            document.getElementById('sv_vol').innerText = data.volatility.toFixed(2)+'%';
+            document.getElementById('sv_volL').innerText = data.volatility_level.toUpperCase();
+            document.getElementById('sv_vol').style.color = data.volatility_level==='low'?'var(--accent-green)':(data.volatility_level==='high'?'var(--accent-red)':'var(--accent-yellow)');
+
+            // High
+            document.getElementById('sv_52w').innerText = data.pct_from_52w_high.toFixed(2)+'%';
+            document.getElementById('sv_52w').style.color = data.pct_from_52w_high > -5 ? 'var(--accent-green)' : (data.pct_from_52w_high > -15 ? 'var(--accent-yellow)' : 'var(--accent-red)');
+
+            // Score
+            const sign = data.score > 0 ? '+' : '';
+            document.getElementById('sv_sco').innerText = sign+data.score;
+            document.getElementById('sv_sco').style.color = getCol(data.score>0, 'var(--accent-green)', getCol(data.score<0, 'var(--accent-red)', 'var(--accent-yellow)'));
+        }
+
+        // ── HISTORY ────────────────────────────────
+        function saveToHistory() {
+            if(!currentResult || !currentSentiment) return;
+            const models = [
+                {id:'LR', name:'Linear Regression', rmse:currentResult.linear_regression.rmse, mae:currentResult.linear_regression.mae},
+                {id:'AR', name:'ARIMA', rmse:currentResult.arima.rmse, mae:currentResult.arima.mae},
+                {id:'LS', name:'LSTM', rmse:currentResult.lstm.rmse, mae:currentResult.lstm.mae}
+            ];
+            const best = models.reduce((a,b) => a.rmse < b.rmse ? a : b);
+
+            const entry = {
+                id: Date.now().toString(),
+                timestamp: new Date().toISOString(),
+                ticker: currentResult.ticker,
+                period: document.getElementById('period').value,
+                forecast_days: parseInt(document.getElementById('forecast_days').value),
+                best_model: best.id,
+                best_model_name: best.name,
+                best_rmse: best.rmse,
+                sentiment: currentSentiment.sentiment,
+                last_price: currentResult.prices[currentResult.prices.length-1]
+            };
+
+            let hist = loadHistory();
+            hist.unshift(entry);
+            if(hist.length>20) hist.pop();
+            localStorage.setItem('stocksense_history', JSON.stringify(hist));
+            renderHistory();
+        }
+
+        function loadHistory() {
+            return JSON.parse(localStorage.getItem('stocksense_history') || '[]');
+        }
+
+        function clearHistory() {
+            if(confirm("Clear all history?")) {
+                localStorage.removeItem('stocksense_history');
+                renderHistory();
+            }
+        }
+
+        function deleteHistoryEntry(e, id) {
+            e.stopPropagation();
+            let h = loadHistory();
+            h = h.filter(x => x.id !== id);
+            localStorage.setItem('stocksense_history', JSON.stringify(h));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const hc = document.getElementById('hist_container');
+            const data = loadHistory();
+            hc.innerHTML = '';
+            
+            if(data.length === 0) {
+                hc.innerHTML = '<div class="hist-empty">No predictions yet.<br>Run a prediction to see history here.</div>';
+                return;
+            }
+
+            data.forEach(e => {
+                const mc = getModelColorInfo(e.best_model);
+                const sc = getSentimentColorInfo(e.sentiment);
+                
+                hc.innerHTML += `
+                    <div class="hc-card" onclick="reRunHistory('${e.ticker}')">
+                        <span class="del-btn" onclick="deleteHistoryEntry(event, '${e.id}')">×</span>
+                        <div class="hc-row">
+                            <span style="font-weight:700;font-size:13px;color:var(--text-primary)">${e.ticker}</span>
+                            <span style="font-size:10px;color:var(--text-muted)">${relativeTime(e.timestamp)}</span>
+                        </div>
+                        <div class="hc-row" style="margin-top:8px">
+                            <span style="border-radius:99px;padding:2px 6px;font-size:9px;background:${mc.bg};color:${mc.c}">${e.best_model_name} Best</span>
+                            <span style="font-size:10px;color:var(--text-muted)">RMSE: ${e.best_rmse.toFixed(4)}</span>
+                        </div>
+                        <div class="hc-row" style="margin-top:8px">
+                            <span style="font-size:10px;color:var(--text-muted)">${e.period.toUpperCase()} · ${e.forecast_days}d forecast</span>
+                            <span style="border-radius:4px;padding:2px 6px;font-size:9px;background:${sc.bg};color:${sc.c}">${e.sentiment}</span>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function reRunHistory(ticker) {
+            document.getElementById('ticker').value = ticker;
+            document.getElementById('center_panel').scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        // ── UTILITIES ──────────────────────────────
+        function formatPrice(t, p) {
+            const sym = String(t).endsWith('.NS') ? '₹' : '$';
+            return sym + parseFloat(p).toFixed(2);
+        }
+        function formatPct(n) {
+            return (n>0?'+':'') + parseFloat(n).toFixed(2) + '%';
+        }
+        function getSentimentColorInfo(lbl) {
+            if(lbl.includes('Strongly Bullish') || lbl==='Bullish') return {c:'var(--accent-green)', bg: 'rgba(61,220,151,0.1)'};
+            if(lbl.includes('Mildly Bullish')) return {c:'#86efac', bg: 'rgba(134,239,172,0.1)'};
+            if(lbl.includes('Neutral')) return {c:'var(--accent-yellow)', bg: 'rgba(247,217,79,0.1)'};
+            if(lbl.includes('Bearish')) return {c:'var(--accent-red)', bg: 'rgba(247,95,95,0.1)'};
+            return {c:'var(--text-secondary)', bg: 'rgba(255,255,255,0.1)'};
+        }
+        function getModelColorInfo(id) {
+            if(id==='LR') return {c:'var(--accent-purple)', bg:'rgba(167,139,250,0.15)'};
+            if(id==='AR') return {c:'var(--accent-orange)', bg:'rgba(247,162,79,0.15)'};
+            if(id==='LS') return {c:'var(--accent-blue)', bg:'rgba(79,142,247,0.15)'};
+            return {c:'var(--text-secondary)', bg: 'rgba(255,255,255,0.1)'};
+        }
+        function relativeTime(iso) {
+            const d = (new Date() - new Date(iso)) / 1000;
+            if(d<60) return "Just now";
+            if(d<3600) return Math.floor(d/60)+" mins ago";
+            if(d<86400) return Math.floor(d/3600)+" hours ago";
+            if(d<604800) { const ds=Math.floor(d/86400); return ds===1?"Yesterday":ds+" days ago";}
+            const dt = new Date(iso);
+            return dt.getDate() + " " + ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][dt.getMonth()];
+        }
     </script>
 </body>
 </html>
