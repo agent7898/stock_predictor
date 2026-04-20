@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Price Trend Predictor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #0f0f13; color: #e0e0e8; margin: 0; padding: 0; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; color: #e0e0e8; }
+        .control-panel { background-color: #1a1a24; border: 1px solid #2a2a3a; padding: 20px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 20px; align-items: flex-end; justify-content: center; flex-wrap: wrap; }
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
+        .input-group label { font-size: 12px; color: #888899; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+        .control-panel input, .control-panel select, .control-panel button { padding: 10px; background-color: #2a2a3a; color: #e0e0e8; border: 1px solid #4a9eff; border-radius: 4px; box-sizing: border-box; }
+        .control-panel button { background-color: #4a9eff; color: #fff; cursor: pointer; border: none; font-weight: bold; height: 39px; }
+        .control-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .loading { display: none; text-align: center; margin: 20px; font-weight: bold; color: #4aff9f; }
+        .error { display: none; background-color: #ff4a4a; color: white; padding: 10px; border-radius: 4px; text-align: center; margin-bottom: 20px; }
+        .chart-container { background-color: #1a1a24; border: 1px solid #2a2a3a; padding: 15px; border-radius: 8px; margin-bottom: 20px; height: 300px; position: relative; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #2a2a3a; }
+        th { background-color: #2a2a3a; }
+        .highlight { background-color: rgba(74, 255, 159, 0.2); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stock Price Trend Predictor</h1>
+        
+        <div class="control-panel">
+            <div class="input-group">
+                <label for="ticker">Stock Ticker</label>
+                <input type="text" id="ticker" value="AAPL" placeholder="e.g., AAPL">
+            </div>
+            
+            <div class="input-group">
+                <label for="period">Historical Data</label>
+                <select id="period">
+                    <option value="1y">1 Year</option>
+                    <option value="2y" selected>2 Years</option>
+                    <option value="3y">3 Years</option>
+                    <option value="5y">5 Years</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
+                <label for="forecast_days">Forecast Limit (Days)</label>
+                <input type="number" id="forecast_days" value="30" min="1" max="90">
+            </div>
+            
+            <button id="run_btn">Run Prediction</button>
+        </div>
+        
+        <div id="loading" class="loading">Training models... this may take 60–120 seconds</div>
+        <div id="error" class="error"></div>
+        
+        <div class="chart-container" id="history_chart_container">
+            <canvas id="history_chart"></canvas>
+        </div>
+        
+        <div class="chart-container" id="comparison_chart_container" style="display: none;">
+            <canvas id="comparison_chart"></canvas>
+        </div>
+        
+        <div class="chart-container" id="forecast_chart_container" style="display: none;">
+            <canvas id="forecast_chart"></canvas>
+        </div>
+        
+        <table id="metrics_table" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Model</th>
+                    <th>MAE</th>
+                    <th>RMSE</th>
+                    <th>R²</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const runBtn = document.getElementById('run_btn');
+        const loading = document.getElementById('loading');
+        const errorMsg = document.getElementById('error');
+        
+        let historyChart, comparisonChart, forecastChart;
+
+        function renderCharts(data) {
+            // Unhide containers
+            document.getElementById('comparison_chart_container').style.display = 'block';
+            document.getElementById('forecast_chart_container').style.display = 'block';
+            document.getElementById('metrics_table').style.display = 'table';
+            
+            // Destroy existing charts
+            if (historyChart) historyChart.destroy();
+            if (comparisonChart) comparisonChart.destroy();
+            if (forecastChart) forecastChart.destroy();
+            
+            // 1. History Chart (Mountain/Line)
+            const ctxHistory = document.getElementById('history_chart').getContext('2d');
+            historyChart = new Chart(ctxHistory, {
+                type: 'line',
+                data: {
+                    labels: data.dates,
+                    datasets: [{
+                        label: `${data.ticker} Historical Close Price`,
+                        data: data.prices,
+                        borderColor: '#888899',
+                        backgroundColor: 'rgba(136, 136, 153, 0.2)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 2. Comparison Chart
+            const lengths = [
+                data.linear_regression.test_actual.length,
+                data.arima.test_actual.length,
+                data.lstm.test_actual.length
+            ];
+            const maxLen = Math.max(...lengths);
+            
+            // Pad arrays with nulls so shorter predictions map to the correct end dates
+            const padArray = (arr, length) => Array(length - arr.length).fill(null).concat(arr);
+            
+            const lrPred = padArray(data.linear_regression.test_predicted, maxLen);
+            const arimaPred = padArray(data.arima.test_predicted, maxLen);
+            const lstmPred = padArray(data.lstm.test_predicted, maxLen);
+            
+            const actualPrices = data.prices.slice(-maxLen);
+            const comparisonLabels = data.dates.slice(-maxLen);
+            
+            const ctxComp = document.getElementById('comparison_chart').getContext('2d');
+            comparisonChart = new Chart(ctxComp, {
+                type: 'line',
+                data: {
+                    labels: comparisonLabels,
+                    datasets: [
+                        { label: 'Actual Price', data: actualPrices, borderColor: '#e0e0e8', borderWidth: 2, pointRadius: 0, fill: false },
+                        { label: 'LR Pred', data: lrPred, borderColor: '#4a9eff', pointRadius: 0, fill: false },
+                        { label: 'ARIMA Pred', data: arimaPred, borderColor: '#ff9f4a', pointRadius: 0, fill: false },
+                        { label: 'LSTM Pred', data: lstmPred, borderColor: '#4aff9f', pointRadius: 0, fill: false }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // 3. Forecast Chart
+            const ctxForecast = document.getElementById('forecast_chart').getContext('2d');
+            forecastChart = new Chart(ctxForecast, {
+                type: 'line',
+                data: {
+                    labels: data.forecast_dates,
+                    datasets: [
+                        { label: 'LR Forecast', data: data.linear_regression.forecast, borderColor: '#4a9eff', borderDash: [5, 5], pointRadius: 0, fill: false },
+                        { label: 'ARIMA Forecast', data: data.arima.forecast, borderColor: '#ff9f4a', borderDash: [5, 5], pointRadius: 0, fill: false },
+                        { label: 'LSTM Forecast', data: data.lstm.forecast, borderColor: '#4aff9f', borderDash: [5, 5], pointRadius: 0, fill: false }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            // Populate table
+            const tbody = document.querySelector('#metrics_table tbody');
+            tbody.innerHTML = '';
+            
+            const metrics = [
+                { name: 'Linear Regression', mae: data.linear_regression.mae, rmse: data.linear_regression.rmse, r2: data.linear_regression.r2.toFixed(4) },
+                { name: 'ARIMA', mae: data.arima.mae, rmse: data.arima.rmse, r2: '—' },
+                { name: 'LSTM', mae: data.lstm.mae, rmse: data.lstm.rmse, r2: '—' }
+            ];
+            
+            let minRmse = Math.min(...metrics.map(m => m.rmse));
+            
+            metrics.forEach(m => {
+                const tr = document.createElement('tr');
+                if (m.rmse === minRmse) tr.className = 'highlight';
+                tr.innerHTML = `<td>${m.name}</td><td>${m.mae.toFixed(4)}</td><td>${m.rmse.toFixed(4)}</td><td>${m.r2}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        runBtn.addEventListener('click', async () => {
+            const ticker = document.getElementById('ticker').value;
+            const period = document.getElementById('period').value;
+            const forecastDays = document.getElementById('forecast_days').value;
+            
+            if (!ticker) return;
+
+            loading.style.display = 'block';
+            errorMsg.style.display = 'none';
+            runBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ticker: ticker, period: period, forecast_days: parseInt(forecastDays) })
+                });
+                
+                const data = await res.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                renderCharts(data);
+                
+            } catch (err) {
+                errorMsg.textContent = "Error: " + err.message;
+                errorMsg.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+                runBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
