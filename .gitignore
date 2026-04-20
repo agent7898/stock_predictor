@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .DS_Store
 project_documentation.txt
+project_documentation.pdf
+.gitignore
